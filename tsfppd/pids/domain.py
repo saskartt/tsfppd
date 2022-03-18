@@ -17,42 +17,55 @@ Sasu Karttunen, University of Helsinki <sasu.karttunen@helsinki.fi>
 """
 
 import warnings
-
+from pyproj import CRS
 
 class Domain:
     """
     Base class for domains. Used for root instance.
     """
-    def __init__(self, domain_id, crs=None, orig_x=None, orig_y=None, pe=None, nx=None, ny=None, nz=None, dx=None,
-                 dy=None, dz=None):
+    def __init__(self, domain_id, epsg=None, npe=None, origin=None, shape=None, resolution=None):
         """
         Initialize Domain object.
+
         Parameters
         ----------
         domain_id
+        crs
+        epsg
+        pe
+        orig_x
+        orig_y
+        nx
+        ny
+        nz
+        dx
+        dy
+        dz
         """
         if isinstance(domain_id, int):
             self.id = domain_id
         else:
-            raise ValueError()
+            raise ValueError(f"Expected integer domain id, got {domain_id}")
 
-        # Location of the origin in coordinates.
-        self.orig_x = orig_x
-        self.orig_y = orig_y
+        # Grid mapping setup
+        self.epsg = epsg
+        self.crs = None
+        self.origin = origin
+        if self.origin is not None:
+            self._validate_origin()
+        if self.epsg is not None:
+            self.set_mapping(epsg)
 
-        # Grid size and resolution
-        self.nx = nx
-        self.ny = ny
-        self.nz = nz
-        self.dx = dx
-        self.dy = dy
-        self.dz = dz
-        self.pe = pe
+        # Grid shape and resolution
+        self.shape = shape
+        if self.shape is not None:
+            self._validate_shape()
+        self.resolution = resolution
+        if self.resolution is not None:
+            self._validate_resolution()
 
-        if None in (self.orig_x, self.orig_y):
-            self._orig_set = False
-        else:
-            self._orig_set = True
+        # Number of processor elements number in x and y directions
+        self.npe = npe
 
         self.children = []
         self.children_ids = []
@@ -73,6 +86,27 @@ class Domain:
         child.set_parent(self)
         self.children.append(child)
         self._has_children = True
+
+    def set_mapping(self, epsg):
+        self.crs = CRS.from_epsg(self.epsg)
+
+    def set_origin(self, origin):
+        self.origin = origin
+        self._validate_origin()
+
+    def set_shape(self, shape):
+        self.shape = shape
+        self._validate_shape()
+
+    def set_resolution(self, resolution):
+        self.resolution = resolution
+        self._validate_resolution()
+
+    def set_pe(self, pe):
+        self.npe = pe
+
+    def generate_grid(self):
+        pass
 
     def remove_child(self, child):
         """
@@ -105,10 +139,35 @@ class Domain:
 
         self.children_ids.append(domain_id)
 
+    def add_static_field(self):
+        pass
+
+    def add_dynamic_field(self):
+        pass
+
+    def _validate_origin(self):
+        if (len(self.origin) != 2) or (None in self.origin):
+            raise ValueError(f"Invalid origin specified.")
+
+    def _validate_shape(self):
+        if (len(self.shape) != 3) or (None in self.shape):
+            raise ValueError(f"Invalid shape specified.")
+
+    def _validate_resolution(self):
+        if (len(self.resolution) != 3) or (None in self.resolution):
+            raise ValueError(f"Invalid shape specified.")
+
+    def _validate_grid_config(self):
+        self._validate_origin()
+        self._validate_shape()
+        self._validate_resolution()
+        self._validate_npe()
+
+
 
 class ChildDomain(Domain):
     """
-    Class for child domains.
+    Class for the child domains.
     """
     def __init__(self, domain_id, offset_x=None, offset_y=None, **kwargs):
         """
