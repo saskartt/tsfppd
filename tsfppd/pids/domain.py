@@ -18,6 +18,7 @@ Sasu Karttunen, University of Helsinki <sasu.karttunen@helsinki.fi>
 
 import warnings
 from pyproj import CRS
+from .inputs import StaticInput, DynamicInput
 
 class Domain:
     """
@@ -67,9 +68,38 @@ class Domain:
         # Number of processor elements number in x and y directions
         self.npe = npe
 
+        # Keep account on child domains
         self.children = []
         self.children_ids = []
         self._has_children = False
+
+        # Keep account on the input fields
+        self.static_fields = []
+        self.dynamic_fields = []
+
+        # Global attributes
+        self.attributes = {}
+
+    def _validate_grid_config(self):
+        self._validate_origin()
+        self._validate_shape()
+        self._validate_resolution()
+        self._validate_npe()
+
+    def _validate_npe(self):
+        pass
+
+    def _validate_origin(self):
+        if (len(self.origin) != 2) or (None in self.origin):
+            raise ValueError(f"Invalid origin specified.")
+
+    def _validate_resolution(self):
+        if (len(self.resolution) != 3) or (None in self.resolution):
+            raise ValueError(f"Invalid shape specified.")
+
+    def _validate_shape(self):
+        if (len(self.shape) != 3) or (None in self.shape):
+            raise ValueError(f"Invalid shape specified.")
 
     def add_child(self, child):
         """
@@ -87,26 +117,43 @@ class Domain:
         self.children.append(child)
         self._has_children = True
 
-    def set_mapping(self, epsg):
-        self.crs = CRS.from_epsg(self.epsg)
+    def add_dynamic_field(self, key, field):
+        self.dynamic_fields.append(field)
 
-    def set_origin(self, origin):
-        self.origin = origin
-        self._validate_origin()
+    def add_static_field(self, key, field):
+        self.static_fields.append(field)
 
-    def set_shape(self, shape):
-        self.shape = shape
-        self._validate_shape()
+    def generate_input_files(self):
+        # Write the static input file
+        static = StaticInput()
+        static.set_fields(self.static_fields)
+        static.set_attributes(self.attributes)
+        static.set_origin(self.origin)
+        static.set_shape(self.shape)
+        static.set_resolution(self.resolution)
+        static.write()
 
-    def set_resolution(self, resolution):
-        self.resolution = resolution
-        self._validate_resolution()
+        # Write the dynamic input file
+        dynamic = DynamicInput()
+        dynamic.set_fields(self.dynamic_fields)
+        dynamic.set_attributes(self.attributes)
+        dynamic.set_origin(self.origin)
+        dynamic.set_shape(self.shape)
+        dynamic.set_resolution(self.resolution)
+        dynamic.write()
 
-    def set_pe(self, pe):
-        self.npe = pe
 
-    def generate_grid(self):
-        pass
+    def register_id(self, domain_id):
+        """
+        # Registers id to be in use.
+        Parameters
+        ----------
+        domain_id
+        """
+        if domain_id in self.children_ids:
+            raise ValueError(f"ChildDomain id {domain_id} already in use.")
+
+        self.children_ids.append(domain_id)
 
     def remove_child(self, child):
         """
@@ -127,42 +174,23 @@ class Domain:
         if len(self.children) == 0:
             self._has_children = False
 
-    def register_id(self, domain_id):
-        """
-        # Registers id to be in use.
-        Parameters
-        ----------
-        domain_id
-        """
-        if domain_id in self.children_ids:
-            raise ValueError(f"ChildDomain id {domain_id} already in use.")
+    def set_mapping(self, epsg):
+        self.crs = CRS.from_epsg(self.epsg)
 
-        self.children_ids.append(domain_id)
-
-    def add_static_field(self):
-        pass
-
-    def add_dynamic_field(self):
-        pass
-
-    def _validate_origin(self):
-        if (len(self.origin) != 2) or (None in self.origin):
-            raise ValueError(f"Invalid origin specified.")
-
-    def _validate_shape(self):
-        if (len(self.shape) != 3) or (None in self.shape):
-            raise ValueError(f"Invalid shape specified.")
-
-    def _validate_resolution(self):
-        if (len(self.resolution) != 3) or (None in self.resolution):
-            raise ValueError(f"Invalid shape specified.")
-
-    def _validate_grid_config(self):
+    def set_origin(self, origin):
+        self.origin = origin
         self._validate_origin()
-        self._validate_shape()
-        self._validate_resolution()
-        self._validate_npe()
 
+    def set_pe(self, pe):
+        self.npe = pe
+
+    def set_resolution(self, resolution):
+        self.resolution = resolution
+        self._validate_resolution()
+
+    def set_shape(self, shape):
+        self.shape = shape
+        self._validate_shape()
 
 
 class ChildDomain(Domain):
@@ -189,8 +217,12 @@ class ChildDomain(Domain):
         else:
             self._orig_set = True
 
-    def set_parent(self, parent):
-        self.parent = parent
+    def generate_grid(self):
+        if not self.static_fields:
+            self.static_fields = self.parent.static_fields
+        if not self.dynamic_fields:
+            self.dynamic_fields = self.parent.dynamic_fields
+        super().generate_grid()
 
     def register_id(self, domain_id):
         """
@@ -202,4 +234,7 @@ class ChildDomain(Domain):
         """
         self.parent.register_id(domain_id)
         self.children_ids.append(domain_id)
+
+    def set_parent(self, parent):
+        self.parent = parent
 

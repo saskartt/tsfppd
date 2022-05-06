@@ -17,4 +17,17 @@ Sasu Karttunen, University of Helsinki <sasu.karttunen@helsinki.fi>
 """
 
 
+class Input():
+    def __init__():
+        pass
+
+
+class DynamicInput(Input):
+    def __init__():
+        pass
+
+
+class StaticInput(Input):
+    def __init__(self):
+        pass
 

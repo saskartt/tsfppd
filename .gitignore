@@ -1,6 +1,11 @@
+# Exclude user data
+/data/**
+# But not the subfolders
+!/data/**/
 
-# Do not commit user's notebooks
+# Ignore user's notebooks
 notebooks/*
+!notebooks/*example*
 
 # Created by https://www.toptal.com/developers/gitignore/api/python,pycharm,visualstudiocode,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,pycharm,visualstudiocode,jupyternotebooks
